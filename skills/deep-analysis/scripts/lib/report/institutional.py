@@ -455,11 +455,15 @@ def _render_style_chip(syn: dict) -> str:
 </div>'''
 
 
-def _render_data_gap_banner(data_gaps: dict | None, raw: dict | None = None) -> str:
+def _render_data_gap_banner(data_gaps: dict | None, raw: dict | None = None, syn: dict | None = None) -> str:
     """v2.3 · Render orange banner listing data gaps. Returns empty string if no gaps.
 
     v3.4.4 · 新增 raw 参数 · 检测 ETF/LOF/mutual_fund 等基金类型 · 调整文案
     避免用户把"基金类型预期缺字段"误判为"数据不可信"。
+
+    v3.4.5 · 新增 syn 参数 · 普通 stock 若 fund_score 偏低 + 覆盖率 <60% ·
+    渲染 low-confidence banner · 警告"评分受数据缺失影响 · 应以 agent 定性评估为准".
+    解决京东方实测 fund_score=37.6 但 agent 重评 65/100 的脱节问题.
     """
     if not isinstance(data_gaps, dict) or not data_gaps.get("tasks"):
         return ""
@@ -469,6 +473,15 @@ def _render_data_gap_banner(data_gaps: dict | None, raw: dict | None = None) -> 
     unresolved = data_gaps.get("unresolved", total)
     ack = total - unresolved
     cov = data_gaps.get("coverage_pct", 0)
+
+    # v3.4.5 · 低可信度检测：stock 类型 + fund_score < 50 + cov < 60%
+    # 满足 → 渲染 low-confidence banner（红色调）· 警告分数不可信
+    is_low_confidence = False
+    fund_score_for_msg = 0
+    if syn and isinstance(syn, dict):
+        fund_score_for_msg = float(syn.get("fundamental_score", 60))
+        if fund_score_for_msg < 50 and cov < 60:
+            is_low_confidence = True
 
     # v3.4.4 · 检测是否基金类型（ETF/LOF/mutual_fund · 不应跑 stock 22 维全套）
     is_fund_like = False
@@ -520,6 +533,21 @@ def _render_data_gap_banner(data_gaps: dict | None, raw: dict | None = None) -> 
         hint = (
             "📌 这不是数据采集失败 · 是基金类型本身的字段差异. "
             "对基金的核心评估应看持仓集中度 / 跟踪误差 / 历史回撤 (UZI 暂不直接评 · 走持仓循环代替)."
+        )
+    elif is_low_confidence:
+        # v3.4.5 · 数据缺多 + fund_score 偏低 · 评分不可信 · 警告用户
+        banner_class = "data-gap-banner low-confidence"
+        title = "🚨 LOW CONFIDENCE · 规则引擎评分可能失真"
+        subtitle = (
+            f"<strong>规则引擎给出 fundamental_score = {fund_score_for_msg:.1f}</strong> · "
+            f"但数据覆盖率仅 <strong>{cov}%</strong> · <strong>{total}</strong> 个核心字段缺失 · "
+            f"当多个维度数据空缺时 · 规则引擎默认给中性 5-6 分 · "
+            f"会人为<strong>拉低 fund_score</strong> · 不一定真实反映基本面."
+        )
+        hint = (
+            "📌 强烈建议：以 <strong>agent 重评估</strong>（基于全 22 维 + DCF + 同行 + 流派分歧）为准 · "
+            "而不是看 fund_score / 评委 0 看多 / 24 看空 这种规则引擎结论. "
+            "下方流派 consensus 也受数据缺失影响 · 仅作参考."
         )
     else:
         banner_class = "data-gap-banner"

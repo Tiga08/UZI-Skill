@@ -175,6 +175,25 @@ body::after {
 }
 .data-gap-banner.fund-type .hint { color: #475569; }
 
+/* v3.4.5 · 低可信度 banner · 红色调强警告（fund_score 偏低 + 覆盖率 <60%）·
+   暗示"不要看规则引擎评分 · 看 agent 重评估" */
+.data-gap-banner.low-confidence {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.10), rgba(220, 38, 38, 0.03));
+  border: 1px solid rgba(185, 28, 28, 0.55);
+  border-left: 4px solid #b91c1c;
+}
+.data-gap-banner.low-confidence .title { color: #7f1d1d; font-size: 16px; }
+.data-gap-banner.low-confidence .subtitle { color: #1f2937; }
+.data-gap-banner.low-confidence .subtitle strong { color: #7f1d1d; font-weight: 800; }
+.data-gap-banner.low-confidence .chip {
+  background: rgba(220, 38, 38, 0.18); color: #7f1d1d;
+  border-color: rgba(185, 28, 28, 0.45); font-weight: 600;
+}
+.data-gap-banner.low-confidence .hint {
+  color: #7f1d1d; font-size: 12px; font-weight: 500;
+}
+.data-gap-banner.low-confidence .hint strong { color: #7f1d1d; font-weight: 700; }
+
 /* ═══════════════ STYLE CHIP · v2.7 ═══════════════ */
 .style-chip-wrap {
   margin: 16px 0 24px;

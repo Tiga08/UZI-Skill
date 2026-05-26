@@ -29,6 +29,32 @@
 
 ---
 
+## v3.4.5 (2026-05-12 · F 派 LHB 反查 + low-confidence banner)
+
+### BUG 1 · F 派游资遇大盘股 100% skip · 与 LHB 实际数据脱节
+- **症状**：用户跑京东方 000725（约 2000 亿市值）· 51 评委里 F 派 23 人全 skip · 但 LHB 实际显示 3-5 个游资参与涨停博弈
+- **位置**：`lib/investor_evaluator.py::_is_youzi_out_of_range`
+- **根因**：v2.13.3 加的市值射程检查没考虑 LHB 实际数据 · 只看 SEATS[nickname] 的 fit_rules max_mcap · 超出就硬 skip
+- **修法**：检测 `features["matched_youzi"]`（fetch_lhb.match_seats_in_lhb 反查的 30 天上榜游资昵称 list）· 若该游资在里面 · 即使市值超射程也不 skip
+- **回归测试**：4 个测试覆盖 (无 LHB skip / 有 LHB active / 射程内 / 非 F 派)
+- **未来注意**：
+  - `matched_youzi` 是 list[str]（nickname）· 不是 list[dict]
+  - 仅对 F 派（_INVESTOR_GROUP_MAP）生效 · A/B/C/D/E/G 派不受影响
+  - 加新游资到 SEATS 时 · 用 list 兼容（不是 set）· 否则 nickname in matched 会失败
+
+### BUG 2 · fund_score 偏低但缺数据时无警告 · 用户误判可信度
+- **症状**：京东方实测 fund_score=37.6 · 但 agent 重评 65/100 · 报告无任何"评分不可信"提示 · 用户读到 0/24 票数会误以为应清仓
+- **位置**：`lib/report/institutional.py::_render_data_gap_banner`
+- **根因**：score_dimensions 对缺数据维度给默认中性 5-6 分 · 多维缺失时会人为拉低 fund_score · 但 banner 没区分"评分可信"vs"评分受缺数据干扰"
+- **修法**：`_render_data_gap_banner(data_gaps, raw, syn)` 新增 syn 参数 · 检测 stock + fund_score<50 + cov<60% → 渲染 low-confidence 红色 banner · 引导用户看 agent 重评
+- **未来注意**：
+  - 阈值 fund_score<50 + cov<60% 是经验值 · 京东方/类似缺数据股的实测 · 调整需更新测试
+  - low-confidence banner 只对 stock 触发 · ETF/LOF 走 fund-type banner（v3.4.4）
+  - 不传 syn 时向后兼容 · 走老 banner
+  - 用红色调 #7f1d1d/#b91c1c · 区别于橙色（普通缺数据警告）+ 蓝色（基金类型）
+
+---
+
 ## v3.4.4 (2026-05-12 · data_gap_banner UX 优化)
 
 ### UX BUG 1 · ETF 17% 覆盖率让用户误判可信度

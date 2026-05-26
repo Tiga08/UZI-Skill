@@ -38,6 +38,10 @@ def _is_youzi_out_of_range(investor_id: str, features: dict) -> tuple[bool, str]
     对 F 组投资者 · 调 seat_db.is_in_range · 不在射程则 skip（不打分）.
     解决 v2.13.2 之前"大市值股对所有游资都判看多/看空"的 bug.
 
+    v3.4.5 · LHB 反查覆盖：如果该游资席位在 30 天内的龙虎榜上实际有
+    买卖记录 · 即使股票市值超出该游资的常规射程 · 也强制参与评分（不 skip）.
+    解决用户反馈"京东方游资 23/23 全 skip · 但 LHB 实际有 3-5 个席位参与涨停"的 bug.
+
     Returns:
         (out_of_range: bool, reason: str)
     """
@@ -50,17 +54,25 @@ def _is_youzi_out_of_range(investor_id: str, features: dict) -> tuple[bool, str]
     nickname = _INVESTOR_NAME_MAP.get(investor_id, "")
     if not nickname or nickname not in SEATS:
         return False, ""  # seat 没定义 · 不做 skip 决策
+
     # is_in_range 需要 market_cap 字段（元）· features 里常叫 market_cap_yi（亿）或 market_cap
     mc = features.get("market_cap") or 0
-    # 兼容：features 可能只有 market_cap_yi（亿）· 换算为元
     if not mc and features.get("market_cap_yi"):
         mc = float(features["market_cap_yi"]) * 1e8
     probe = dict(features)
     probe["market_cap"] = mc
-    if not is_in_range(nickname, probe):
-        mc_yi = mc / 1e8 if mc else 0
-        return True, f"市值 {mc_yi:.0f} 亿不在 {nickname} 射程"
-    return False, ""
+
+    if is_in_range(nickname, probe):
+        return False, ""
+
+    # v3.4.5 · 射程外但 LHB 显示该席位真实参与 → 不 skip · 强制评分
+    # matched_youzi 是 list[str] of 游资昵称（来自 fetch_lhb.match_seats_in_lhb keys）
+    matched = features.get("matched_youzi") or []
+    if matched and nickname in matched:
+        return False, ""  # LHB 反查覆盖 · 实际参与了 · 不能 skip
+
+    mc_yi = mc / 1e8 if mc else 0
+    return True, f"市值 {mc_yi:.0f} 亿不在 {nickname} 射程"
 
 
 # ────────────────────────────────────────────────────────────────

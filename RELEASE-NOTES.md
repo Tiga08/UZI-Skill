@@ -28,6 +28,78 @@ python run.py 600519.SH --depth medium --no-browser --output-dir /var/uzi/report
 
 ---
 
+## v3.4.5 — 2026-05-12 (F 派游资 LHB 反查 + low-confidence banner)
+
+### 用户反馈（京东方 000725 agent 实测截图）
+
+用户用 codex agent 跑京东方 · 发现两个关键问题：
+
+1. **51 评委 0 看多 / 4 中性 / 24 看空 / 23 游资跳过** · 但 agent 备注"龙虎榜显示 3-5 位游资参与涨停博弈" → **F 派全 skip 是 bug · 不应 skip 实际有 LHB 记录的席位**
+2. **规则引擎 fund_score 37.6 但 agent 重评 65/100**（基本面拐点真实）· 标注"空数据拖累 · 参考价值低" → **报告应主动警告这个 score 不可信**
+
+### 修法 1 · F 派 LHB 反查覆盖 (`lib/investor_evaluator.py`)
+
+`_is_youzi_out_of_range` 在判 skip 之前 · 检查 `features.matched_youzi`（lhb fetcher 反查的 30 天上榜席位昵称 list）：
+
+```python
+# 老逻辑（v2.13.3）：市值不在射程 → 永远 skip
+# v3.4.5：市值不在射程 + matched_youzi 含该游资 → 不 skip · 强制评分
+```
+
+效果：京东方这种 2000 亿大盘股 · 即使常规游资射程 50-500 亿 · 只要 LHB 显示赵老哥/孙哥/章盟主等实际上榜 · 这几位都会参与评分（不 skip）.
+
+### 修法 2 · Low-confidence banner (`lib/report/institutional.py`)
+
+`_render_data_gap_banner(data_gaps, raw, syn)` 新增 `syn` 参数 · 检测：
+
+```
+stock 类型 + fund_score < 50 + coverage_pct < 60% → 渲染 low-confidence 红色调 banner
+```
+
+文案：
+```
+🚨 LOW CONFIDENCE · 规则引擎评分可能失真
+
+规则引擎给出 fundamental_score = 37.6 ·
+但数据覆盖率仅 30% · 15 个核心字段缺失 ·
+当多个维度数据空缺时 · 规则引擎默认给中性 5-6 分 ·
+会人为拉低 fund_score · 不一定真实反映基本面.
+
+📌 强烈建议：以 agent 重评估 为准 · 而不是看 fund_score / 评委 0 看多 / 24 看空 这种规则引擎结论.
+```
+
+CSS 用**深红色调** (`#7f1d1d / #b91c1c`) · 与 stock 普通橙色 banner / ETF 蓝色 banner 区分.
+
+### 三种 banner 总览
+
+| 触发条件 | Banner | 颜色 |
+|---|---|---|
+| 基金（ETF/LOF/mutual_fund） | `fund-type` | 蓝色（info）|
+| stock + fund_score<50 + cov<60% | **`low-confidence`** ✨ v3.4.5 | **红色（warning）** |
+| 其他 stock 缺数据 | 默认 | 橙色 |
+
+### 回归测试
+
+新增 `tests/test_v3_4_5_youzi_lhb_and_lowconf.py` (10 tests):
+- F 派 LHB 反查 4 个分支（无 LHB skip / 有 LHB active / 射程内 / 非 F 派）
+- low-confidence banner 6 个分支（触发 / ETF 不触发 / fund OK / cov OK / 无 syn / CSS 颜色）
+
+**总套件 407 tests 全过**（397 baseline + 10 新）.
+
+### 致谢
+
+社群用户用 codex agent 实测京东方 · 给出详细的"规则引擎 vs agent 重评"对比表 · 让我们直接定位到两个深层 UX 问题（评委误 skip + score 不可信无提示）.
+
+### 升级
+
+```bash
+hermes skills update wbh604/UZI-Skill/skills/deep-analysis
+# 或
+cd UZI-Skill && git pull
+```
+
+---
+
 ## v3.4.4 — 2026-05-12 (data quality banner UX 优化)
 
 ### 用户反馈
