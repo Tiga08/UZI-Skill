@@ -161,12 +161,14 @@ def _portfolio_health(metrics: list[dict]) -> dict:
 
 def _render_html(portfolio_name: str, metrics: list[dict], health: dict, depth: str) -> str:
     """单 HTML · 组合总览 + 排名 + 加权汇总."""
+    from lib.versus_runner import _esc  # v3.7.2 · 复用 HTML 转义助手 · 防 self-XSS
     template_path = ASSETS_DIR / "report-template.html"
     full = template_path.read_text(encoding="utf-8")
     style_start = full.find("<style>")
     style_end = full.find("</style>") + len("</style>")
     main_style = full[style_start:style_end] if style_start > 0 else ""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    portfolio_name = _esc(portfolio_name)  # title / h1 都用它 · 先转义
 
     # 排序：按 score 降序
     ranked = sorted(
@@ -184,11 +186,11 @@ def _render_html(portfolio_name: str, metrics: list[dict], health: dict, depth: 
         rows.append(
             f'<tr style="border-bottom:1px solid var(--border)">'
             f'  <td style="padding:10px 16px;color:var(--text-dim);font-family:Fira Code,monospace;font-size:11px">#{i}</td>'
-            f'  <td style="padding:10px 16px"><div style="font-weight:700;color:var(--text-bright)">{m["name"]}</div>'
-            f'    <div style="font-size:11px;color:var(--text-dim);font-family:Fira Code,monospace">{m["ticker"]} · {m.get("industry","—")}</div></td>'
+            f'  <td style="padding:10px 16px"><div style="font-weight:700;color:var(--text-bright)">{_esc(m["name"])}</div>'
+            f'    <div style="font-size:11px;color:var(--text-dim);font-family:Fira Code,monospace">{_esc(m["ticker"])} · {_esc(m.get("industry","—"))}</div></td>'
             f'  <td style="padding:10px 16px;text-align:right;font-variant-numeric:tabular-nums">{w:.1f}%</td>'
             f'  <td style="padding:10px 16px;text-align:right;color:{sc_color};font-weight:700;font-variant-numeric:tabular-nums">{sc:.1f}</td>'
-            f'  <td style="padding:10px 16px;font-size:12px;color:var(--text-main)">{m.get("verdict","—")}</td>'
+            f'  <td style="padding:10px 16px;font-size:12px;color:var(--text-main)">{_esc(m.get("verdict","—"))}</td>'
             f'  <td style="padding:10px 16px;text-align:center;font-size:11px">'
             f'    <span style="color:var(--bull-green)">📈{m.get("bull_count",0)}</span> · '
             f'    <span style="color:var(--bear-red)">📉{m.get("bear_count",0)}</span>'
@@ -242,7 +244,7 @@ def _render_html(portfolio_name: str, metrics: list[dict], health: dict, depth: 
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow-sm)">
       <div style="font-size:10px;letter-spacing:.16em;color:var(--text-dim);margin-bottom:6px">行业分散</div>
       <div style="font-size:32px;font-weight:900;color:var(--text-bright);font-variant-numeric:tabular-nums">{health["n_industries"]}</div>
-      <div style="font-size:11px;color:var(--text-dim)">{', '.join(health.get("industries", [])[:3])}{'...' if len(health.get("industries", [])) > 3 else ''}</div>
+      <div style="font-size:11px;color:var(--text-dim)">{', '.join(_esc(x) for x in health.get("industries", [])[:3])}{'...' if len(health.get("industries", [])) > 3 else ''}</div>
     </div>
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow-sm)">
       <div style="font-size:10px;letter-spacing:.16em;color:var(--text-dim);margin-bottom:6px">综合判定</div>

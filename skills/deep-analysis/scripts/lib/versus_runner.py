@@ -32,6 +32,17 @@ def _safe(v, default="—"):
     return v
 
 
+def _esc(v, default="—") -> str:
+    """v3.7.2 · HTML 转义 · 防御性纵深（股票名/备注若含 < > & 不会注入）.
+
+    数据源是 akshare/东财 · 通常无恶意 · 但 --portfolio 的 CSV note/name 是
+    用户可控字段 · 统一转义杜绝 self-XSS。
+    """
+    import html as _html
+    s = _safe(v, default)
+    return _html.escape(str(s), quote=True)
+
+
 def _num(v, decimals=1):
     try:
         return f"{float(v):.{decimals}f}"
@@ -136,9 +147,9 @@ def _render_comparison_grid(stocks: list[dict]) -> str:
         for s in stocks:
             cells.append(
                 f'<th style="width:{col_pct};padding:12px 16px;text-align:center">'
-                f'<div style="font-size:16px;font-weight:700;color:var(--text-bright)">{s["name"]}</div>'
+                f'<div style="font-size:16px;font-weight:700;color:var(--text-bright)">{_esc(s["name"])}</div>'
                 f'<div style="font-family:Fira Code,monospace;font-size:11px;color:var(--text-dim);margin-top:2px">'
-                f'{s["ticker"]}</div></th>'
+                f'{_esc(s["ticker"])}</div></th>'
             )
         return "<tr>" + "".join(cells) + "</tr>"
 
@@ -194,15 +205,15 @@ def _render_verdict_cards(stocks: list[dict]) -> str:
         cards.append(
             f'<div style="flex:1;min-width:240px;background:var(--bg-card);border:1px solid var(--border);'
             f'border-radius:12px;padding:20px;box-shadow:var(--shadow-sm)">'
-            f'  <div style="font-size:11px;color:var(--text-dim);letter-spacing:.14em;margin-bottom:4px">{s["ticker"]}</div>'
-            f'  <div style="font-size:18px;font-weight:700;color:var(--text-bright)">{s["name"]}</div>'
-            f'  <div style="font-size:11px;color:var(--text-dim);margin-top:2px">{s["industry"]}</div>'
+            f'  <div style="font-size:11px;color:var(--text-dim);letter-spacing:.14em;margin-bottom:4px">{_esc(s["ticker"])}</div>'
+            f'  <div style="font-size:18px;font-weight:700;color:var(--text-bright)">{_esc(s["name"])}</div>'
+            f'  <div style="font-size:11px;color:var(--text-dim);margin-top:2px">{_esc(s["industry"])}</div>'
             f'  <div style="margin:14px 0;display:flex;align-items:baseline;gap:8px">'
             f'    <span style="font-size:36px;font-weight:900;color:{sc_color};font-variant-numeric:tabular-nums" class="count-up">{_num(sc, 1)}</span>'
             f'    <span style="font-size:14px;color:var(--text-dim)">/ 100</span>'
             f'  </div>'
-            f'  <div style="font-size:13px;font-weight:600;color:{sc_color}">{s["verdict"]}</div>'
-            f'  <div style="font-size:11px;color:var(--text-dim);margin-top:4px">{s.get("verdict_detail", "")}</div>'
+            f'  <div style="font-size:13px;font-weight:600;color:{sc_color}">{_esc(s["verdict"])}</div>'
+            f'  <div style="font-size:11px;color:var(--text-dim);margin-top:4px">{_esc(s.get("verdict_detail", ""), "")}</div>'
             f'  <div style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);'
             f'display:flex;gap:10px;font-size:11px">'
             f'    <span style="color:var(--bull-green)">📈 {bull}</span>'
@@ -210,7 +221,7 @@ def _render_verdict_cards(stocks: list[dict]) -> str:
             f'    <span style="color:var(--bear-red)">📉 {bear}</span>'
             f'  </div>'
             f'  <div style="margin-top:10px;font-size:11px;color:var(--text-mid);font-style:italic;line-height:1.4">'
-            f'    {s.get("punchline", "")[:120]}'
+            f'    {_esc(s.get("punchline", "")[:120], "")}'
             f'  </div>'
             f'</div>'
         )
@@ -219,8 +230,8 @@ def _render_verdict_cards(stocks: list[dict]) -> str:
 
 def _render_html(stocks: list[dict], depth: str) -> str:
     """v3.6.0 · 拼装最终 versus HTML · 复用 main report 的 CSS 主题变量."""
-    titles = " VS ".join(s["name"] for s in stocks)
-    tickers_csv = " · ".join(s["ticker"] for s in stocks)
+    titles = " VS ".join(_esc(s["name"]) for s in stocks)
+    tickers_csv = " · ".join(_esc(s["ticker"]) for s in stocks)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # 复用主模板的 :root + dark-theme + jargon CSS · 单独读
@@ -242,9 +253,9 @@ def _render_html(stocks: list[dict], depth: str) -> str:
                 f'<div style="flex:1;padding:16px 20px;background:var(--bg-tinted);'
                 f'border-left:3px solid var(--neon-cyan);border-radius:8px">'
                 f'<div style="font-size:10px;letter-spacing:.16em;color:var(--neon-cyan);margin-bottom:6px">'
-                f'PUNCHLINE · {s["name"]}</div>'
+                f'PUNCHLINE · {_esc(s["name"])}</div>'
                 f'<div style="font-size:13px;color:var(--text-main);line-height:1.5;font-style:italic">'
-                f'{s["punchline"][:200]}</div>'
+                f'{_esc(s["punchline"][:200], "")}</div>'
                 f'</div>'
             )
         punch_block = f'<div style="display:flex;gap:14px;margin:24px 0;flex-wrap:wrap">{"".join(cells)}</div>'
